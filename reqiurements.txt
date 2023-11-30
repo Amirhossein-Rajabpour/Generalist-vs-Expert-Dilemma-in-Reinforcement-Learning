@@ -1,0 +1,4 @@
+minigrid==2.3.1
+gymnasium==0.28.1
+ray[rllib]==2.8.0
+torch==2.1.1
