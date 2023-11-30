@@ -1,11 +1,8 @@
 from ray import tune, air
-import ray
 from ray.tune.registry import register_env
 from ray.rllib.algorithms.impala import ImpalaConfig
 import gymnasium as gym
-from ray.rllib.env.vector_env import VectorEnv
-import numpy as np
-from minigrid.wrappers import ImgObsWrapper, FlatObsWrapper, FullyObsWrapper
+from minigrid.wrappers import FlatObsWrapper
 
 
 
