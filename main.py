@@ -1,5 +1,6 @@
 import argparse
 import numpy as np
+import random
 
 import ray
 from ray import tune, air
@@ -12,11 +13,14 @@ from minigrid.wrappers import FlatObsWrapper
 
 
 class MultiTaskMiniGridEnv(gym.Env):
-    def __init__(self, env_names):
+    def __init__(self, env_names, seed=None):
         self.envs = [FlatObsWrapper(gym.make(env_name)) for env_name in env_names]
         self.current_env = self.envs[0]
         self.action_space = self.current_env.action_space
         self.observation_space = self.current_env.observation_space
+        if seed is not None:
+            for env in self.envs:
+                env.seed(seed)
 
     def reset(self, *, seed=None, options=None):
         self.current_env = self.envs[np.random.choice(len(self.envs))]  
@@ -26,7 +30,7 @@ class MultiTaskMiniGridEnv(gym.Env):
         return self.current_env.step(action)
 
 
-def main(args):    
+def main(args):        
     env_names = ['MiniGrid-Empty-8x8-v0', 'MiniGrid-DoorKey-5x5-v0', 'MiniGrid-Empty-5x5-v0']
     baselines = {
         "IMPALA": impala.ImpalaConfig,
@@ -37,17 +41,23 @@ def main(args):
         "DQN": dqn.DQNConfig
     }
     
-    ray.init()
+    ray.init() # initializing ray
+    
+    # setting random seeds
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+    
     if args.mode == "SingleTask":
         env_names = [args.env]
-    register_env(args.mode, lambda _: MultiTaskMiniGridEnv(env_names))
+    register_env(args.mode, lambda _: MultiTaskMiniGridEnv(env_names, seed=args.seed))
 
     config = baselines[args.algorithm]() \
         .environment(env=args.mode) \
         .resources(num_gpus=args.n_gpus) \
         .rollouts(num_rollout_workers=args.n_workers) \
         .framework("torch") \
-        .training(lr=tune.grid_search(args.lr), grad_clip=20.0)
+        .training(lr=tune.grid_search(args.lr), grad_clip=20.0) \
+        .seed(args.seed)
     
     tune.Tuner(
         args.algorithm,
@@ -63,6 +73,7 @@ if __name__ == "__main__":
     parser.add_argument("--algorithm", type=str, default="IMPALA", help="algorithm to use: options[IMPALA, PPO, SAC, A2C, A3C, DQN]")
     parser.add_argument("--train_iters", type=int, default=20, help="number of training iterations")
     parser.add_argument('--lr', metavar='N', type=float, nargs='+', default=[0.0001], help='a float for the learning rate')
+    parser.add_argument("--seed", type=int, default=42, help="random seed")
     
     parser.add_argument("--n_gpus", type=int, default=1, help="number of gpus")
     parser.add_argument("--n_workers", type=int, default=15, help="number of workers")
