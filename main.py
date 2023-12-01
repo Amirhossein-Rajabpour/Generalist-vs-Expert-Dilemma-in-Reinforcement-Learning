@@ -18,9 +18,7 @@ class MultiTaskMiniGridEnv(gym.Env):
         self.current_env = self.envs[0]
         self.action_space = self.current_env.action_space
         self.observation_space = self.current_env.observation_space
-        if seed is not None:
-            for env in self.envs:
-                env.seed(seed)
+
 
     def reset(self, *, seed=None, options=None):
         self.current_env = self.envs[np.random.choice(len(self.envs))]  
@@ -56,9 +54,8 @@ def main(args):
         .resources(num_gpus=args.n_gpus) \
         .rollouts(num_rollout_workers=args.n_workers) \
         .framework("torch") \
-        .training(lr=tune.grid_search(args.lr), grad_clip=20.0) \
-        .seed(args.seed)
-    
+        .training(lr=tune.grid_search(args.lr), grad_clip=20.0)
+        
     tune.Tuner(
         args.algorithm,
         run_config=air.RunConfig(stop={"training_iteration": args.train_iters}),
@@ -70,7 +67,7 @@ if __name__ == "__main__":
     
     parser.add_argument("--mode", type=str, default="MultiTask", help="Single or MultiTask")
     parser.add_argument("--env", type=str, default="MiniGrid-Empty-8x8-v0", help="environment to use (just for the SingleTask mode)")
-    parser.add_argument("--algorithm", type=str, default="IMPALA", help="algorithm to use: options[IMPALA, PPO, SAC, A2C, A3C, DQN]")
+    parser.add_argument("--algorithm", type=str, default="DQN", help="algorithm to use: options[IMPALA, PPO, SAC, A2C, A3C, DQN]")
     parser.add_argument("--train_iters", type=int, default=20, help="number of training iterations")
     parser.add_argument('--lr', metavar='N', type=float, nargs='+', default=[0.0001], help='a float for the learning rate')
     parser.add_argument("--seed", type=int, default=42, help="random seed")
