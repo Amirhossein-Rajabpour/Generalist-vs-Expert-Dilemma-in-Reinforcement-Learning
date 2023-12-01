@@ -7,13 +7,12 @@ import ray
 from ray import tune, air
 from ray.tune.registry import register_env
 from ray.rllib.algorithms import impala, ppo, sac, a2c, a3c, dqn
-from ray.tune.logger import CSVLoggerCallback
 
 import gymnasium as gym
 from minigrid.wrappers import FlatObsWrapper
 
-from envs import BaseEnv
 from maps import *
+from envs import BaseEnv
 
 
 class MultiTaskMiniGridEnv(gym.Env):
@@ -72,10 +71,13 @@ def main(args):
     log_dir = os.path.abspath(args.log_dir)
     os.makedirs(log_dir, exist_ok=True)
     
+    exp_name = f'{args.algorithm}_{args.mode}_{args.map}' if args.mode == "SingleTask" else f'{args.algorithm}_{args.mode}'
+    
     tune.Tuner(
         args.algorithm,
         run_config=air.RunConfig(
             stop={"timesteps_total": args.total_timesteps}, # stops when total timesteps is reached
+            name=exp_name, # name of the experiment
             storage_path=log_dir # path to store results
             ),
         param_space=config.to_dict(),
