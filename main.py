@@ -18,10 +18,12 @@ class MultiTaskMiniGridEnv(gym.Env):
         self.current_env = self.envs[0]
         self.action_space = self.current_env.action_space
         self.observation_space = self.current_env.observation_space
+        self.turn = 0
 
 
     def reset(self, *, seed=None, options=None):
-        self.current_env = self.envs[np.random.choice(len(self.envs))]  
+        self.current_env = self.envs[self.turn] 
+        self.turn = (self.turn + 1) % len(self.envs) 
         return self.current_env.reset()
 
     def step(self, action):
