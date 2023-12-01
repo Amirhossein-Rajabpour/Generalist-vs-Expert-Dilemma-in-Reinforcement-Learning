@@ -29,7 +29,7 @@ class MultiTaskMiniGridEnv(gym.Env):
 
 
 def main(args):        
-    env_names = ['MiniGrid-Empty-8x8-v0', 'MiniGrid-DoorKey-5x5-v0', 'MiniGrid-Empty-5x5-v0']
+    env_names = ['MiniGrid-Empty-8x8-v0', 'MiniGrid-DoorKey-5x5-v0', 'MiniGrid-FourRooms-v0']
     baselines = {
         "IMPALA": impala.ImpalaConfig,
         "PPO": ppo.PPOConfig,
@@ -58,7 +58,7 @@ def main(args):
         
     tune.Tuner(
         args.algorithm,
-        run_config=air.RunConfig(stop={"training_iteration": args.train_iters}),
+        run_config=air.RunConfig(stop={"timesteps_total": 1e6}),
         param_space=config.to_dict(),
     ).fit()
 
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     
     parser.add_argument("--mode", type=str, default="MultiTask", help="Single or MultiTask")
     parser.add_argument("--env", type=str, default="MiniGrid-Empty-8x8-v0", help="environment to use (just for the SingleTask mode)")
-    parser.add_argument("--algorithm", type=str, default="DQN", help="algorithm to use: options[IMPALA, PPO, SAC, A2C, A3C, DQN]")
+    parser.add_argument("--algorithm", type=str, default="IMPALA", help="algorithm to use: options[IMPALA, PPO, SAC, A2C, A3C, DQN]")
     parser.add_argument("--train_iters", type=int, default=20, help="number of training iterations")
     parser.add_argument('--lr', metavar='N', type=float, nargs='+', default=[0.0001], help='a float for the learning rate')
     parser.add_argument("--seed", type=int, default=42, help="random seed")
