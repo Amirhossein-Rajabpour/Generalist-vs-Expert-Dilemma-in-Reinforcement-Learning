@@ -6,21 +6,25 @@ import ray
 from ray import tune, air
 from ray.tune.registry import register_env
 from ray.rllib.algorithms import impala, ppo, sac, a2c, a3c, dqn
-
 import gymnasium as gym
 from minigrid.wrappers import FlatObsWrapper
 
+from envs import BaseEnv
+from maps import *
 
 
 class MultiTaskMiniGridEnv(gym.Env):
-    def __init__(self, env_names, seed=None):
-        self.envs = [FlatObsWrapper(gym.make(env_name)) for env_name in env_names]
+    def __init__(self, maps, seed=None):
+        self.envs = [FlatObsWrapper(BaseEnv(map=map_i)) for map_i in maps]
         self.current_env = self.envs[0]
         self.action_space = self.current_env.action_space
         self.observation_space = self.current_env.observation_space
         self.turn = 0
+        self.seed = seed
 
-
+        for env in self.envs:
+            env.action_space.seed(seed)
+                
     def reset(self, *, seed=None, options=None):
         self.current_env = self.envs[self.turn] 
         self.turn = (self.turn + 1) % len(self.envs) 
@@ -31,7 +35,7 @@ class MultiTaskMiniGridEnv(gym.Env):
 
 
 def main(args):        
-    env_names = ['MiniGrid-Empty-8x8-v0', 'MiniGrid-DoorKey-5x5-v0', 'MiniGrid-FourRooms-v0']
+    all_maps = [map0, map1, map2, map3]
     baselines = {
         "IMPALA": impala.ImpalaConfig,
         "PPO": ppo.PPOConfig,
@@ -48,8 +52,11 @@ def main(args):
     random.seed(args.seed)
     
     if args.mode == "SingleTask":
-        env_names = [args.env]
-    register_env(args.mode, lambda _: MultiTaskMiniGridEnv(env_names, seed=args.seed))
+        maps = [all_maps[args.map]]
+    else:
+        maps = all_maps
+        
+    register_env(args.mode, lambda _: MultiTaskMiniGridEnv(maps, args.seed))
 
     config = baselines[args.algorithm]() \
         .environment(env=args.mode) \
@@ -68,7 +75,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Expert-Generalist Dilemma in Reinforcement Learning")
     
     parser.add_argument("--mode", type=str, default="MultiTask", help="Single or MultiTask")
-    parser.add_argument("--env", type=str, default="MiniGrid-Empty-8x8-v0", help="environment to use (just for the SingleTask mode)")
+    parser.add_argument("--map", type=int, default=1, help="environment to use (just for the SingleTask mode) options[0, 1, 2, 3]")
     parser.add_argument("--algorithm", type=str, default="IMPALA", help="algorithm to use: options[IMPALA, PPO, SAC, A2C, A3C, DQN]")
     parser.add_argument("--train_iters", type=int, default=20, help="number of training iterations")
     parser.add_argument('--lr', metavar='N', type=float, nargs='+', default=[0.0001], help='a float for the learning rate')
