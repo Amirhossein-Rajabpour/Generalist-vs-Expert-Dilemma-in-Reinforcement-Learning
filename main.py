@@ -26,6 +26,8 @@ class SharedList:
         self.num_envs = len(all_maps)
         self.rewards = [0] * self.num_envs
         self.eposides = [0] * self.num_envs
+        self.time_steps = [0] * self.num_envs
+        self.total_time_steps = [0] * self.num_envs
 
     def rewards_add_item(self, index, item):
         self.rewards[index] += item
@@ -39,10 +41,21 @@ class SharedList:
     def eposides_get_list(self):
         return self.eposides
     
+    def time_steps_increment(self, index):
+        self.time_steps[index] += 1
+        self.total_time_steps[index] += 1
+        
+    def time_steps_get_list(self):
+        return self.time_steps
+    
+    def total_time_steps_get_list(self):
+        return self.total_time_steps
+    
     def reset(self):
         for i in range(self.num_envs):
             self.rewards[i] = 0
             self.eposides[i] = 0
+            self.time_steps[i] = 0
         
 
 class CustomLoggerCallback(CSVLoggerCallback):
@@ -53,15 +66,21 @@ class CustomLoggerCallback(CSVLoggerCallback):
     def log_trial_result(self, iteration: int, trial: "Trial", result: Dict):
         rewards = ray.get(self.shared_list_actor.rewards_get_list.remote())
         eposides = ray.get(self.shared_list_actor.eposides_get_list.remote())
+        time_steps = ray.get(self.shared_list_actor.time_steps_get_list.remote())
+        total_time_steps = ray.get(self.shared_list_actor.total_time_steps_get_list.remote())
         
         new_cols = []
         for i in range(len(all_maps)):
             if eposides[i] != 0:
-                col_name = f'env{i}_mean_reward'
-                result[col_name] = rewards[i]/eposides[i]
-                new_cols.append(col_name)
-        
-            
+                col_mean_reward = f'env{i}_mean_reward'
+                col_mean_length = f'env{i}_mean_episode_length'
+                col_total_time_steps = f'env{i}_tts'
+                result[col_mean_reward] = rewards[i]/eposides[i]
+                result[col_mean_length] = time_steps[i]/eposides[i]
+                result[col_total_time_steps] = total_time_steps[i]
+                new_cols.append(col_mean_reward)
+                new_cols.append(col_mean_length)
+                new_cols.append(col_total_time_steps)
             
         if trial not in self._trial_files:
             self._setup_trial(trial)
@@ -142,7 +161,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Expert-Generalist Dilemma in Reinforcement Learning")
     
-    parser.add_argument("--map_i", type=int, default=-1, help="map to use. Options are [0, 1, 2, 3]. -1 for all maps")
+    parser.add_argument("--map_i", type=int, default=1, help="map to use. Options are [0, 1, 2, 3]. -1 for all maps")
     parser.add_argument("--algorithm", type=str, default="IMPALA", help="algorithm to use: options[IMPALA, PPO, SAC, A2C, A3C, DQN]")
     
     # training specs

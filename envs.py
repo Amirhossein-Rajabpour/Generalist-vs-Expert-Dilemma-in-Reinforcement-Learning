@@ -74,6 +74,7 @@ class BaseEnv(MiniGridEnv):
     def step(self, action):
         obs, reward, terminated, truncated, info = super().step(action)
         self.shared_list_actor.rewards_add_item.remote(self.map_index, reward)
+        self.shared_list_actor.time_steps_increment.remote(self.map_index)
 
         return obs, reward, terminated, truncated, info
     
