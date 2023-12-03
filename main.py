@@ -1,43 +1,93 @@
 import os
+import csv
+import random
 import argparse
 import numpy as np
-import random
+from typing import Dict
+from datetime import datetime
+
 
 import ray
 from ray import tune, air
+from ray.tune.experiment.trial import Trial
 from ray.tune.registry import register_env
+from ray.tune.utils import flatten_dict
+from ray.tune.logger import CSVLoggerCallback
 from ray.rllib.algorithms import impala, ppo, sac, a2c, a3c, dqn
 
-import gymnasium as gym
 from minigrid.wrappers import FlatObsWrapper
 
-from maps import *
-from envs import BaseEnv
+from envs import BaseEnv, all_maps
 
 
-class MultiTaskMiniGridEnv(gym.Env):
-    def __init__(self, maps, seed=None):
-        self.envs = [FlatObsWrapper(BaseEnv(map=map_i)) for map_i in maps]
-        self.current_env = self.envs[0]
-        self.action_space = self.current_env.action_space
-        self.observation_space = self.current_env.observation_space
-        self.turn = 0
-        self.seed = seed
+@ray.remote(num_cpus=4)
+class SharedList:
+    def __init__(self):
+        self.num_envs = len(all_maps)
+        self.rewards = [0] * self.num_envs
+        self.eposides = [0] * self.num_envs
 
-        for env in self.envs:
-            env.action_space.seed(seed)
-                
-    def reset(self, *, seed=None, options=None):
-        self.current_env = self.envs[self.turn] 
-        self.turn = (self.turn + 1) % len(self.envs) 
-        return self.current_env.reset()
+    def rewards_add_item(self, index, item):
+        self.rewards[index] += item
 
-    def step(self, action):
-        return self.current_env.step(action)
+    def rewards_get_list(self):
+        return self.rewards
+    
+    def eposides_increment(self, index):
+        self.eposides[index] += 1
+        
+    def eposides_get_list(self):
+        return self.eposides
+    
+    def reset(self):
+        for i in range(self.num_envs):
+            self.rewards[i] = 0
+            self.eposides[i] = 0
+        
 
+class CustomLoggerCallback(CSVLoggerCallback):
+    def __init__(self, shared_list_actor):
+        super().__init__()
+        self.shared_list_actor = shared_list_actor
+        
+    def log_trial_result(self, iteration: int, trial: "Trial", result: Dict):
+        rewards = ray.get(self.shared_list_actor.rewards_get_list.remote())
+        eposides = ray.get(self.shared_list_actor.eposides_get_list.remote())
+        
+        new_cols = []
+        for i in range(len(all_maps)):
+            if eposides[i] != 0:
+                col_name = f'env{i}_mean_reward'
+                result[col_name] = rewards[i]/eposides[i]
+                new_cols.append(col_name)
+        
+            
+            
+        if trial not in self._trial_files:
+            self._setup_trial(trial)
+
+        tmp = result.copy()
+        tmp.pop("config", None)
+        result = flatten_dict(tmp, delimiter="/")
+
+        if not self._trial_csv[trial]:
+            self._trial_csv[trial] = csv.DictWriter(
+                self._trial_files[trial], result.keys()
+            )
+            if not self._trial_continue[trial]:
+                self._trial_csv[trial].writeheader()
+        
+        fieldnames = list(self._trial_csv[trial].fieldnames) + new_cols
+        self._trial_csv[trial].writerow(
+            {k: v for k, v in result.items() if k in fieldnames}
+        )
+        self._trial_files[trial].flush()
+        self.shared_list_actor.reset.remote()
+        
+        
+        
 
 def main(args):        
-    all_maps = [map0, map1, map2, map3]
     baselines = {
         "IMPALA": impala.ImpalaConfig,
         "PPO": ppo.PPOConfig,
@@ -52,30 +102,36 @@ def main(args):
     # setting random seeds
     np.random.seed(args.seed)
     random.seed(args.seed)
-    
-    if args.mode == "SingleTask":
-        maps = [all_maps[args.map]]
-    else:
-        maps = all_maps
         
-    register_env(args.mode, lambda _: MultiTaskMiniGridEnv(maps, args.seed))
+    
+    shared_list_actor = SharedList.remote()
+    if args.map_i == -1: # MultiTask
+        mode = "MultiTask"
+        register_env(mode, lambda config: FlatObsWrapper(BaseEnv(config.worker_index % len(all_maps), shared_list_actor)))
+    else:
+        mode = "SingleTask"
+        register_env(mode, lambda _: FlatObsWrapper(BaseEnv(args.map_i, shared_list_actor)))
+    
+    
 
     config = baselines[args.algorithm]() \
-        .environment(env=args.mode) \
+        .environment(env=mode) \
         .resources(num_gpus=args.n_gpus) \
         .rollouts(num_rollout_workers=args.n_workers) \
         .framework("torch") \
-        .training(lr=tune.grid_search(args.lr), grad_clip=20.0)
+        .training(lr=tune.grid_search(args.lr))
         
     # Ensure the log directory exists
     log_dir = os.path.abspath(args.log_dir)
     os.makedirs(log_dir, exist_ok=True)
     
-    exp_name = f'{args.algorithm}_{args.mode}_{args.map}' if args.mode == "SingleTask" else f'{args.algorithm}_{args.mode}'
+    exp_name = f'{args.algorithm}_SingleTask_{args.map_i}' if mode == "SingleTask" else f'{args.algorithm}_MultiTask'
+    exp_name += f'_{datetime.now().strftime("%m-%d %H:%M")}'
     
     tune.Tuner(
         args.algorithm,
         run_config=air.RunConfig(
+            callbacks=[CustomLoggerCallback(shared_list_actor)],
             stop={"timesteps_total": args.total_timesteps}, # stops when total timesteps is reached
             name=exp_name, # name of the experiment
             storage_path=log_dir # path to store results
@@ -86,8 +142,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Expert-Generalist Dilemma in Reinforcement Learning")
     
-    parser.add_argument("--mode", type=str, default="MultiTask", help="Single or MultiTask")
-    parser.add_argument("--map", type=int, default=1, help="environment to use (just for the SingleTask mode) options[0, 1, 2, 3]")
+    parser.add_argument("--map_i", type=int, default=-1, help="map to use. Options are [0, 1, 2, 3]. -1 for all maps")
     parser.add_argument("--algorithm", type=str, default="IMPALA", help="algorithm to use: options[IMPALA, PPO, SAC, A2C, A3C, DQN]")
     
     # training specs
@@ -98,7 +153,7 @@ if __name__ == "__main__":
     
     # hardware specs
     parser.add_argument("--n_gpus", type=int, default=1, help="number of gpus")
-    parser.add_argument("--n_workers", type=int, default=15, help="number of workers")
+    parser.add_argument("--n_workers", type=int, default=11, help="number of workers")
     
     # logging
     parser.add_argument("--log_dir", type=str, default="./results", help="path to store results")
