@@ -1,110 +1,21 @@
 import os
-import csv
 import random
 import argparse
 import numpy as np
-from typing import Dict
 from datetime import datetime
-
 
 import ray
 from ray import tune, air
-from ray.tune.experiment.trial import Trial
 from ray.tune.registry import register_env
-from ray.tune.utils import flatten_dict
-from ray.tune.logger import CSVLoggerCallback
 from ray.rllib.algorithms import impala, ppo, sac, a2c, a3c, dqn
 
 from minigrid.wrappers import FlatObsWrapper
 
 from envs import BaseEnv, all_maps
-
-
-@ray.remote(num_cpus=4)
-class SharedList:
-    def __init__(self):
-        self.num_envs = len(all_maps)
-        self.rewards = [0] * self.num_envs
-        self.eposides = [0] * self.num_envs
-        self.time_steps = [0] * self.num_envs
-        self.total_time_steps = [0] * self.num_envs
-
-    def rewards_add_item(self, index, item):
-        self.rewards[index] += item
-
-    def rewards_get_list(self):
-        return self.rewards
-    
-    def eposides_increment(self, index):
-        self.eposides[index] += 1
-        
-    def eposides_get_list(self):
-        return self.eposides
-    
-    def time_steps_increment(self, index):
-        self.time_steps[index] += 1
-        self.total_time_steps[index] += 1
-        
-    def time_steps_get_list(self):
-        return self.time_steps
-    
-    def total_time_steps_get_list(self):
-        return self.total_time_steps
-    
-    def reset(self):
-        for i in range(self.num_envs):
-            self.rewards[i] = 0
-            self.eposides[i] = 0
-            self.time_steps[i] = 0
+from utils.shared_list import SharedList
+from utils.callbacks import CustomLoggerCallback
         
 
-class CustomLoggerCallback(CSVLoggerCallback):
-    def __init__(self, shared_list_actor):
-        super().__init__()
-        self.shared_list_actor = shared_list_actor
-        
-    def log_trial_result(self, iteration: int, trial: "Trial", result: Dict):
-        rewards = ray.get(self.shared_list_actor.rewards_get_list.remote())
-        eposides = ray.get(self.shared_list_actor.eposides_get_list.remote())
-        time_steps = ray.get(self.shared_list_actor.time_steps_get_list.remote())
-        total_time_steps = ray.get(self.shared_list_actor.total_time_steps_get_list.remote())
-        
-        new_cols = []
-        for i in range(len(all_maps)):
-            if eposides[i] != 0:
-                col_mean_reward = f'env{i}_mean_reward'
-                col_mean_length = f'env{i}_mean_episode_length'
-                col_total_time_steps = f'env{i}_tts'
-                result[col_mean_reward] = rewards[i]/eposides[i]
-                result[col_mean_length] = time_steps[i]/eposides[i]
-                result[col_total_time_steps] = total_time_steps[i]
-                new_cols.append(col_mean_reward)
-                new_cols.append(col_mean_length)
-                new_cols.append(col_total_time_steps)
-            
-        if trial not in self._trial_files:
-            self._setup_trial(trial)
-
-        tmp = result.copy()
-        tmp.pop("config", None)
-        result = flatten_dict(tmp, delimiter="/")
-
-        if not self._trial_csv[trial]:
-            self._trial_csv[trial] = csv.DictWriter(
-                self._trial_files[trial], result.keys()
-            )
-            if not self._trial_continue[trial]:
-                self._trial_csv[trial].writeheader()
-        
-        fieldnames = list(self._trial_csv[trial].fieldnames) + new_cols
-        self._trial_csv[trial].writerow(
-            {k: v for k, v in result.items() if k in fieldnames}
-        )
-        self._trial_files[trial].flush()
-        self.shared_list_actor.reset.remote()
-        
-        
-        
 
 def main(args):        
     baselines = {
@@ -161,7 +72,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Expert-Generalist Dilemma in Reinforcement Learning")
     
-    parser.add_argument("--map_i", type=int, default=1, help="map to use. Options are [0, 1, 2, 3]. -1 for all maps")
+    parser.add_argument("--map_i", type=int, default=-1, help="map to use. Options are [0, 1, 2, 3]. -1 for all maps")
     parser.add_argument("--algorithm", type=str, default="IMPALA", help="algorithm to use: options[IMPALA, PPO, SAC, A2C, A3C, DQN]")
     
     # training specs
