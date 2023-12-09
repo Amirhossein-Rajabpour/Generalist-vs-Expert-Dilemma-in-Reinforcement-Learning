@@ -1,8 +1,7 @@
 from envs import BaseEnv
 from maps import *
 from minigrid.manual_control import ManualControl
-from main import SharedList
-
+from utils.shared_list import SharedList
 
 class CustomManualControl(ManualControl):
     def reset(self, seed=None):

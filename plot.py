@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 
 from pathlib import Path
 
+from envs import BaseEnv
+from utils.shared_list import SharedList
+
 
 def get_subdirectories(dir):
     return [entry.name for entry in Path(dir).iterdir() if entry.is_dir()]
@@ -32,6 +35,17 @@ def plot_metric(dir, metric, map_i, y_axis='time steps'):
 
     plt.xlabel(y_axis)
     plt.ylabel(metric)
-    plt.title(f'map{map_i}')
+    plt.title(f'env{map_i}')
     plt.legend()
     plt.show()
+    
+def plot_map(map_index):
+    env = BaseEnv(map_index=map_index, shared_list_actor=SharedList.remote(), render_mode="rgb_array")
+
+    # plot initial state
+    env.reset(seed=42, options=None)
+    img = env.render()
+    plt.title(f'env{map_index}')
+    plt.xticks([])
+    plt.yticks([])
+    plt.imshow(img)
