@@ -8,6 +8,7 @@ import ray
 from ray import tune, air
 from ray.tune.registry import register_env
 from ray.rllib.algorithms import impala, ppo, sac, a2c, a3c, dqn
+from ray.rllib.utils.torch_utils import set_torch_seed
 
 from minigrid.wrappers import FlatObsWrapper
 
@@ -15,8 +16,8 @@ from envs import BaseEnv, all_maps
 from utils.shared_list import SharedList
 from utils.callbacks import CustomLoggerCallback
         
-
-
+        
+        
 def main(args):        
     baselines = {
         "IMPALA": impala.ImpalaConfig,
@@ -28,11 +29,6 @@ def main(args):
     }
     
     ray.init() # initializing ray
-    
-    # setting random seeds
-    np.random.seed(args.seed)
-    random.seed(args.seed)
-        
     
     shared_list_actor = SharedList.remote()
     if args.map_i == -1: # MultiTask
@@ -49,7 +45,13 @@ def main(args):
         .resources(num_gpus=args.n_gpus) \
         .rollouts(num_rollout_workers=args.n_workers) \
         .framework("torch") \
-        .training(lr=tune.grid_search(args.lr))
+        .training(lr=tune.grid_search(args.lr)) \
+            
+    # setting random seeds
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+    set_torch_seed(args.seed)
+    config['seed'] = args.seed
         
     # Ensure the log directory exists
     log_dir = os.path.abspath(args.log_dir)
@@ -68,6 +70,8 @@ def main(args):
             ),
         param_space=config.to_dict(),
     ).fit()
+    
+    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Expert-Generalist Dilemma in Reinforcement Learning")
