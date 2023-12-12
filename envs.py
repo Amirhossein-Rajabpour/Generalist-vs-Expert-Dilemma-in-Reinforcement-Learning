@@ -18,7 +18,7 @@ class BaseEnv(MiniGridEnv):
         size=10,
         agent_start_pos=(1, 1),
         agent_start_dir=0,
-        max_steps=200,
+        max_steps=400,
         **kwargs,
     ):
         self.map_index = map_index
