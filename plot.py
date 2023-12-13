@@ -71,14 +71,14 @@ def plot_algorithms(dir, metric, map_i, y_axis='interactions'):
                 elif current_algo == 'IMPALA':
                     df_IMPALA = pd.concat([df_IMPALA, df[[col_reward]]], axis=1)
 
-            if df_PPO.columns.size == NUM_SEEDS:
+            if df_PPO.columns.size == NUM_SEEDS+5:
                 print(df_PPO.columns.size)
                 df_PPO['PPO'] = df_PPO.mean(axis=1)
                 dfs = pd.concat([dfs, df_PPO[['PPO']]], axis=1)
-            elif df_APPO.columns.size == NUM_SEEDS:
+            elif df_APPO.columns.size == NUM_SEEDS+5:
                 df_APPO['APPO'] = df_APPO.mean(axis=1)
                 dfs = pd.concat([dfs, df_APPO[['APPO']]], axis=1)
-            elif df_IMPALA.columns.size == NUM_SEEDS:
+            elif df_IMPALA.columns.size == NUM_SEEDS+5:
                 df_IMPALA['IMPALA'] = df_IMPALA.mean(axis=1)
                 dfs = pd.concat([dfs, df_IMPALA[['IMPALA']]], axis=1)
 
