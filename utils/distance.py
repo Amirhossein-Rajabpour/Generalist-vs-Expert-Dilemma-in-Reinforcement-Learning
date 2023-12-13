@@ -1,19 +1,13 @@
 import numpy as np
 
 def top_left(map):
-    '''returns the coordinates of the top-most, left-most 1 in the map'''
-    x, y = -1, -1
-    
+    '''returns the coordinates of the top-most, left-most 1 in the map'''    
     for i in range(len(map)):
         for j in range(len(map[i])):
-            if x == -1:
                 if map[i][j] == 1:
-                    x, y = i, j
-                    break
-            else:
-                break
+                    return i, j
     
-    return x, y
+    return -1, -1
     
 
 def distance(map1, map2):
@@ -48,3 +42,6 @@ def distance(map1, map2):
                 min_edits = edits
 
     return min_edits
+
+
+

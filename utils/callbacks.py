@@ -16,7 +16,9 @@ class CustomLoggerCallback(CSVLoggerCallback):
         
     def log_trial_result(self, iteration: int, trial: "Trial", result: Dict):
         rewards = ray.get(self.shared_list_actor.rewards_get_list.remote())
+        total_rewards = ray.get(self.shared_list_actor.total_rewards_get_list.remote())
         eposides = ray.get(self.shared_list_actor.eposides_get_list.remote())
+        total_eposides = ray.get(self.shared_list_actor.total_eposides_get_list.remote())
         time_steps = ray.get(self.shared_list_actor.time_steps_get_list.remote())
         total_time_steps = ray.get(self.shared_list_actor.total_time_steps_get_list.remote())
         
@@ -24,12 +26,15 @@ class CustomLoggerCallback(CSVLoggerCallback):
         for i in range(len(all_maps)):
             if eposides[i] != 0:
                 col_mean_reward = f'env{i}_mean_reward'
+                col_total_mean_reward = f'env{i}_total_mean_reward'
                 col_mean_length = f'env{i}_mean_episode_length'
                 col_total_time_steps = f'env{i}_tts'
                 result[col_mean_reward] = rewards[i]/eposides[i]
+                result[col_total_mean_reward] = total_rewards[i]/total_eposides[i]
                 result[col_mean_length] = time_steps[i]/eposides[i]
                 result[col_total_time_steps] = total_time_steps[i]
                 new_cols.append(col_mean_reward)
+                new_cols.append(col_total_mean_reward)
                 new_cols.append(col_mean_length)
                 new_cols.append(col_total_time_steps)
             

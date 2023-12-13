@@ -7,7 +7,7 @@ from datetime import datetime
 import ray
 from ray import tune, air
 from ray.tune.registry import register_env
-from ray.rllib.algorithms import impala, ppo, sac, a2c, a3c, dqn
+from ray.rllib.algorithms import impala, ppo, sac, a2c, a3c, dqn, appo
 from ray.rllib.utils.torch_utils import set_torch_seed
 
 from minigrid.wrappers import FlatObsWrapper
@@ -25,7 +25,8 @@ def main(args):
         "SAC": sac.SACConfig,
         "A2C": a2c.A2CConfig,
         "A3C": a3c.A3CConfig,
-        "DQN": dqn.DQNConfig
+        "DQN": dqn.DQNConfig,
+        "APPO": appo.APPOConfig
     }
     
     ray.init() # initializing ray
