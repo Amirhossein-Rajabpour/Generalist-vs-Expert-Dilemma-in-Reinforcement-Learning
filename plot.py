@@ -142,9 +142,9 @@ def plot_interactions(dir, metric, map_i, y_axis='interactions'):
 
     # plot the average dataframe
     # plt.plot(df_mean.index, df_mean[col_reward], color=color)
-    plt.plot(dfs.index, dfs['multi-task'], color='blue')
-    plt.plot(dfs.index, dfs['single-task'], color='red')
-    plt.legend(list(dfs.columns))
+    plt.plot(dfs.index, dfs['multi-task'], color='blue', label='Multi-Task')
+    plt.plot(dfs.index, dfs['single-task'], color='red', label='Single-Task')
+    plt.legend()
     plt.xlabel(y_axis)
     plt.ylabel(metric)
     plt.title(f'env{map_i}')
