@@ -122,32 +122,33 @@ def plot_interactions(dir, metric, map_i, y_axis='interactions'):
                 else:
                     df_Single = pd.concat([df_Single, df[[col_reward]]], axis=1)
 
-            print("========================df before===========================")
-            display(dfs)
+            # print("========================df before===========================")
+            # display(dfs)
 
             if df_Multi.columns.size == NUM_SEEDS:
-                df_Multi['multi'] = df_Multi.mean(axis=1)
-                dfs = pd.concat([dfs, df_Multi[['multi']]], axis=1)
+                df_Multi['multi-task'] = df_Multi.mean(axis=1)
+                dfs = pd.concat([dfs, df_Multi[['multi-task']]], axis=1)
             elif df_Single.columns.size == NUM_SEEDS:
-                df_Single['single'] = df_Single.mean(axis=1)
-                dfs = pd.concat([dfs, df_Single[['single']]], axis=1)
+                df_Single['single-task'] = df_Single.mean(axis=1)
+                dfs = pd.concat([dfs, df_Single[['single-task']]], axis=1)
 
         # concatenate dataframes and calculate mean
-    print("========================df===========================")
-    display(dfs)
+    # print("========================df===========================")
+    # display(dfs)
 
     # df_concat = pd.concat(dfs)
     # df_mean = df_concat.groupby(df_concat[col_time_steps]).mean()
     # dfs['avg'] = dfs.mean(axis=1)
     # df_average = dfs[['avg']]
 
-    print("=========================df mean============================")
+    # print("=========================df mean============================")
     # display(df_average)
 
     # plot the average dataframe
     # plt.plot(df_mean.index, df_mean[col_reward], color=color)
-    plt.plot(dfs.index, dfs)
-    plt.legend(list(dfs.columns))
+    plt.plot(dfs.index, dfs['multi-task'], color='blue', label='Multi-Task')
+    plt.plot(dfs.index, dfs['single-task'], color='red', label='Single-Task')
+    plt.legend()
     plt.xlabel(y_axis)
     plt.ylabel(metric)
     plt.title(f'env{map_i}')
