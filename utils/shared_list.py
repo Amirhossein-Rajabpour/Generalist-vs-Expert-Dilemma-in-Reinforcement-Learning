@@ -1,7 +1,7 @@
 import ray
 from envs import all_maps
 
-@ray.remote(num_cpus=5)
+@ray.remote(num_cpus=1)
 class SharedList:
     def __init__(self):
         self.num_envs = len(all_maps)
